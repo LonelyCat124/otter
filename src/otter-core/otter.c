@@ -253,11 +253,15 @@ on_ompt_callback_parallel_begin(
     thread_data_t *thread_data = (thread_data_t*) get_thread_data()->ptr;
     task_data_t *task_data = (task_data_t*) encountering_task->ptr;
 
-    thread_data->is_master_thread = true;
-
     /* assign space for this parallel region */
     parallel_data_t *parallel_data = new_parallel_data(flags);
     parallel->ptr = parallel_data;
+
+    /* The master thread owns the lock on the prior node unless it waits during
+       a single region */
+    thread_data->is_master_thread = true;
+    pthread_mutex_lock(&parallel_data->lock_prior_node);
+    thread_data->owns_prior_node = true;
 
     /* create trace region definition */
     parallel_data->region = trace_new_region_definition(
@@ -331,8 +335,10 @@ on_ompt_callback_parallel_end(
         // connect_enclosed_nodes(parallel_data->scope,
         //     parallel_data->scope->end_node);
 
-        /* reset flag */
+        /* Master (encountering) thread releases ownership of prior node */
         thread_data->is_master_thread = false;
+        thread_data->owns_prior_node = false;
+        pthread_mutex_unlock(&parallel_data->lock_prior_node);
     }
     return;
 }
@@ -763,12 +769,35 @@ on_ompt_callback_work(
 {
     thread_data_t *thread_data = (thread_data_t*) get_thread_data()->ptr;
     task_data_t *task_data = (task_data_t*) task->ptr;
-
-    if (wstype == ompt_work_single_executor && endpoint == ompt_scope_begin)
-        thread_data->is_single = true;
+    parallel_data_t *parallel_data = (parallel_data_t*) parallel->ptr;
 
     LOG_DEBUG_WORK_TYPE(thread_data->id, wstype, count,
         endpoint==ompt_scope_begin?"begin":"end");
+
+    if (endpoint == ompt_scope_begin)
+    {
+        if (wstype == ompt_work_single_executor
+            && !thread_data->is_master_thread)
+        {
+            /* The thread that executes a single region acquires the lock on the
+               prior node for the duration of the single region (unless it is
+               the master thread and already owns the lock) */
+            LOG_DEBUG("[t=%lu] worker thread acquiring lock %p",
+                thread_data->id, &parallel_data->lock_prior_node);
+            // thread_data->is_single = true;
+            pthread_mutex_lock(&parallel_data->lock_prior_node);
+            thread_data->owns_prior_node = true;
+        } else if (wstype == ompt_work_single_other 
+            && thread_data->is_master_thread)
+        {
+            /* The master thread releases lock on prior node when it isn't the 
+               executor of a single region */
+            LOG_DEBUG("[t=%lu] master thread releasing lock %p",
+                thread_data->id, &parallel_data->lock_prior_node);
+            thread_data->owns_prior_node = false;
+            pthread_mutex_unlock(&parallel_data->lock_prior_node);
+        }
+    }
 
     char *wstype_str= 
         wstype == ompt_work_loop            ? "loop"       : 
@@ -868,9 +897,33 @@ on_ompt_callback_work(
         #endif
     }
 
-    if (wstype == ompt_work_single_executor && endpoint == ompt_scope_end)
-        thread_data->is_single = false;
-
+    if (endpoint == ompt_scope_end)
+    {
+        if (wstype == ompt_work_single_executor
+            && !thread_data->is_master_thread)
+        {
+            LOG_DEBUG("[t=%lu] worker thread releasing lock %p",
+                thread_data->id, &parallel_data->lock_prior_node);
+            parallel_data->ready_prior_node = true;
+            thread_data->owns_prior_node = false;
+            pthread_cond_signal(&parallel_data->cond_prior_node);
+            pthread_mutex_unlock(&parallel_data->lock_prior_node);
+        } else if (wstype == ompt_work_single_other 
+            && thread_data->is_master_thread)
+        {
+            LOG_DEBUG("[t=%lu] master thread acquiring lock %p",
+                thread_data->id, &parallel_data->lock_prior_node);
+            pthread_mutex_lock(&parallel_data->lock_prior_node);
+            while (!parallel_data->ready_prior_node)
+            {
+                pthread_cond_wait(
+                    &parallel_data->cond_prior_node,
+                    &parallel_data->lock_prior_node);
+            }
+            thread_data->owns_prior_node = true;
+            parallel_data->ready_prior_node = false;
+        }
+    }
     return;
 }
 
@@ -1009,9 +1062,10 @@ on_ompt_callback_sync_region(
     }
 
     /* Only the master thread of a team creates a synchronisation barrier */
-    bool finalise_barrier = thread_data->is_master_thread;
+    // bool finalise_barrier = thread_data->is_master_thread;
 
-    if (endpoint == ompt_scope_begin || !finalise_barrier) return;
+    // if (endpoint == ompt_scope_begin || !finalise_barrier) return;
+    if (endpoint == ompt_scope_begin) return;
 
     /* At sync-end:
         - if enclosing scope is parallel scope, master thread collects

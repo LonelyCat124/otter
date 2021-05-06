@@ -15,7 +15,11 @@ new_parallel_data(int flags)
         .flags              = flags,
         .actual_parallelism = 0,
         .region             = NULL,
-        .scope              = NULL
+        .scope              = NULL,
+        .prior_node         = NULL,
+        .lock_prior_node    = PTHREAD_MUTEX_INITIALIZER,
+        .cond_prior_node    = PTHREAD_COND_INITIALIZER,
+        .ready_prior_node   = false,
     };
 
     /* NOTE: don't push scope onto thread's stack UNTIL implicit-task-begin */
@@ -41,6 +45,7 @@ new_thread_data(ompt_thread_t type)
         .region_scope_stack = stack_create(),
         .is_master_thread   = false,
         .is_single          = false,
+        .owns_prior_node    = false,
         .prior_scope        = NULL,
         .actual_parallelism = 0,
         .index              = 0,

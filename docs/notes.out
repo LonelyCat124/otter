@@ -1,7 +1,0 @@
-\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
-\BOOKMARK [1][-]{section.2}{OTTER Core}{}% 2
-\BOOKMARK [2][-]{subsection.2.1}{Parallel-begin and Implicit-task-begin events}{section.2}% 3
-\BOOKMARK [2][-]{subsection.2.2}{Connecting Consecutive Scopes}{section.2}% 4
-\BOOKMARK [1][-]{section.3}{Graph Data Structure}{}% 5
-\BOOKMARK [1][-]{section.4}{OTTER Task Graph}{}% 6
-\BOOKMARK [1][-]{section.5}{OTTER Trace}{}% 7

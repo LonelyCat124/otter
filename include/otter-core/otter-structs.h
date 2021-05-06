@@ -21,6 +21,10 @@ struct parallel_data_t {
     unsigned int        actual_parallelism;
     trace_region_def_t *region;
     scope_t            *scope;
+    task_graph_node_t  *prior_node;
+    pthread_mutex_t     lock_prior_node;
+    pthread_cond_t      cond_prior_node;
+    bool                ready_prior_node;
 };
 
 /* Thread */
@@ -30,13 +34,14 @@ struct thread_data_t {
     unique_id_t           id;
     trace_location_def_t *location;
     ompt_thread_t         type;
-    stack_t              *region_scope_stack; // sequence of nested scopes
-    scope_t              *prior_scope;        // most recently pushed/popped from stack
-    bool                  is_master_thread;   // of parallel region
-    bool                  is_single;          // in single region
-    unsigned int          actual_parallelism; // in current parallel region
-    unsigned int          index;              // in current parallel region
-    queue_t              *sync_node_queue;    // master thread collects sync nodes
+    stack_t              *region_scope_stack;   // sequence of nested scopes
+    scope_t              *prior_scope;          // most recently pushed/popped from stack
+    bool                  is_master_thread;     // of parallel region
+    bool                  is_single;            // in single region
+    bool                  owns_prior_node;      // of parallel region
+    unsigned int          actual_parallelism;   // in current parallel region
+    unsigned int          index;                // in current parallel region
+    queue_t              *sync_node_queue;      // master thread collects sync nodes
 };
 
 /* Task */
