@@ -220,7 +220,7 @@ on_ompt_callback_thread_end(
         scope_t *scope = NULL;
         while (queue_pop(global_scope_queue, (data_item_t*) &scope))
         {
-            connect_enclosed_nodes(scope, scope->end_node);
+            // connect_enclosed_nodes(scope, scope->end_node);
             scope_destroy(scope);
         }
         queue_destroy(global_scope_queue, false, NULL);
@@ -268,11 +268,11 @@ on_ompt_callback_parallel_begin(
 
     /* At scope-begin, if the prior scope was a scope-end, link together
        otherwise, link to encountering task  */
-    connect_prior_scope_node(
-        thread_data->prior_scope,
-        parallel_data->scope->begin_node,
-        task_data
-    );
+    // connect_prior_scope_node(
+    //     thread_data->prior_scope,
+    //     parallel_data->scope->begin_node,
+    //     task_data
+    // );
 
     /* At scope-begin, add to global queue for eventual clean-up at tool-exit */
     pthread_mutex_lock(&global_scope_queue_lock);
@@ -322,9 +322,9 @@ on_ompt_callback_parallel_end(
         while (queue_pop(
             thread_data->sync_node_queue, (data_item_t*) &sync_node))
         {
-            connect_enclosed_nodes(parallel_data->scope, sync_node);
-            stack_push(parallel_data->scope->task_graph_nodes,
-                (data_item_t) {.ptr = sync_node});
+            // connect_enclosed_nodes(parallel_data->scope, sync_node);
+            // stack_push(parallel_data->scope->task_graph_nodes,
+            //     (data_item_t) {.ptr = sync_node});
         }
 
         /* make sure enclosed nodes connect to scope-end node */
@@ -443,8 +443,8 @@ on_ompt_callback_task_create(
                 (data_item_t*) &task_data->scope);
 
             /* Connect task's node to enclosing scope's begin node */
-            task_graph_add_edge(task_data->scope->begin_node,
-                task_data->task_node_ref);
+            // task_graph_add_edge(task_data->scope->begin_node,
+            //     task_data->task_node_ref);
 
         } else {
 
@@ -452,15 +452,15 @@ on_ompt_callback_task_create(
             task_data->scope = parent_task_data->scope;
 
             /* Connect to node of encountering task */
-            task_graph_add_edge(parent_task_data->task_node_ref,
-                task_data->task_node_ref);
+            // task_graph_add_edge(parent_task_data->task_node_ref,
+            //     task_data->task_node_ref);
         }
 
         /* Attach self to scope's task nodes for eventual cleanup */
-        pthread_mutex_lock(&task_data->scope->lock);
-        stack_push(task_data->scope->task_graph_nodes,
-            (data_item_t) {.ptr = task_data->task_node_ref});
-        pthread_mutex_unlock(&task_data->scope->lock);
+        // pthread_mutex_lock(&task_data->scope->lock);
+        // stack_push(task_data->scope->task_graph_nodes,
+        //     (data_item_t) {.ptr = task_data->task_node_ref});
+        // pthread_mutex_unlock(&task_data->scope->lock);
     }
             
     return;
@@ -810,17 +810,17 @@ on_ompt_callback_work(
                 (data_item_t*) &current_scope);
 
             /* add begin node to enclosing scope's stack of nodes */
-            pthread_mutex_lock(&current_scope->lock);
-            stack_push(current_scope->task_graph_nodes,
-                (data_item_t) {.ptr = scope->begin_node});
-            stack_push(current_scope->task_graph_nodes,
-                (data_item_t) {.ptr = scope->end_node});
-            pthread_mutex_unlock(&current_scope->lock);
+            // pthread_mutex_lock(&current_scope->lock);
+            // stack_push(current_scope->task_graph_nodes,
+            //     (data_item_t) {.ptr = scope->begin_node});
+            // stack_push(current_scope->task_graph_nodes,
+            //     (data_item_t) {.ptr = scope->end_node});
+            // pthread_mutex_unlock(&current_scope->lock);
 
             /* At scope-begin, if the prior scope was a scope-end, link together
             otherwise, link to encountering task  */
-            connect_prior_scope_node(thread_data->prior_scope,
-                scope->begin_node, task_data);
+            // connect_prior_scope_node(thread_data->prior_scope,
+            //     scope->begin_node, task_data);
             
             stack_push(thread_data->region_scope_stack,
                 (data_item_t) {.ptr = scope});
@@ -845,9 +845,9 @@ on_ompt_callback_work(
             while (queue_pop(
                 thread_data->sync_node_queue, (data_item_t*) &sync_node))
             {
-                connect_enclosed_nodes(thread_data->prior_scope, sync_node);
-                stack_push(thread_data->prior_scope->task_graph_nodes,
-                    (data_item_t) {.ptr = sync_node});
+                // connect_enclosed_nodes(thread_data->prior_scope, sync_node);
+                // stack_push(thread_data->prior_scope->task_graph_nodes,
+                //     (data_item_t) {.ptr = sync_node});
             }
 
             stack_pop(thread_data->region_scope_stack,
@@ -980,8 +980,8 @@ on_ompt_callback_sync_region(
             pthread_mutex_unlock(&current_scope->lock);
 
             /* connect to current scope's node */
-            connect_prior_scope_node(thread_data->prior_scope,
-                scope->begin_node, task_data);
+            // connect_prior_scope_node(thread_data->prior_scope,
+            //     scope->begin_node, task_data);
 
             /* record new scope as the current scope */
             stack_push(thread_data->region_scope_stack,
@@ -1166,19 +1166,19 @@ connect_prior_scope_node(
 
     if (encountering_task->type == ompt_task_initial)
     {
-        task_graph_add_edge(
-            prior_scope == NULL ?
-                encountering_task->task_node_ref : prior_scope->end_node,
-            scope_create_begin_node);
+        // task_graph_add_edge(
+        //     prior_scope == NULL ?
+        //         encountering_task->task_node_ref : prior_scope->end_node,
+        //     scope_create_begin_node);
     } else if (encountering_task->type == ompt_task_implicit)
     {
-        task_graph_add_edge(
-            prior_scope->endpoint == ompt_scope_begin ?
-                prior_scope->begin_node : prior_scope->end_node,
-            scope_create_begin_node);
+        // task_graph_add_edge(
+        //     prior_scope->endpoint == ompt_scope_begin ?
+        //         prior_scope->begin_node : prior_scope->end_node,
+        //     scope_create_begin_node);
     } else {
-        task_graph_add_edge(encountering_task->task_node_ref,
-            scope_create_begin_node);
+        // task_graph_add_edge(encountering_task->task_node_ref,
+        //     scope_create_begin_node);
     }
 
     return;
@@ -1190,11 +1190,12 @@ connect_enclosed_nodes(scope_t *scope, task_graph_node_t *tail_node)
 {
     task_graph_node_t *node = NULL;
     if (stack_size(scope->task_graph_nodes) == 0)
-        task_graph_add_edge(scope->begin_node, tail_node);
-    else {
-        while (stack_pop(scope->task_graph_nodes, (data_item_t*) &node))
-            if (!graph_node_has_children(node))
-                task_graph_add_edge(node, tail_node);
+    {
+        // task_graph_add_edge(scope->begin_node, tail_node);
+    } else {
+        // while (stack_pop(scope->task_graph_nodes, (data_item_t*) &node))
+        //     if (!graph_node_has_children(node))
+        //         task_graph_add_edge(node, tail_node);
     }
     return;
 }
