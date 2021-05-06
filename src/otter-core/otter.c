@@ -767,6 +767,7 @@ on_ompt_callback_work(
     uint64_t                 count,
     const void              *codeptr_ra)
 {
+
     thread_data_t *thread_data = (thread_data_t*) get_thread_data()->ptr;
     task_data_t *task_data = (task_data_t*) task->ptr;
     parallel_data_t *parallel_data = (parallel_data_t*) parallel->ptr;
@@ -774,6 +775,7 @@ on_ompt_callback_work(
     LOG_DEBUG_WORK_TYPE(thread_data->id, wstype, count,
         endpoint==ompt_scope_begin?"begin":"end");
 
+    /* Pass ownership of prior_node to the thread executing a single block */
     if (endpoint == ompt_scope_begin)
     {
         if (wstype == ompt_work_single_executor
@@ -799,15 +801,6 @@ on_ompt_callback_work(
         }
     }
 
-    char *wstype_str= 
-        wstype == ompt_work_loop            ? "loop"       : 
-        wstype == ompt_work_sections        ? "sections"   : 
-        wstype == ompt_work_single_executor ? "single"     : 
-        wstype == ompt_work_single_other    ? "single oth" : 
-        wstype == ompt_work_workshare       ? "workshare"  : 
-        wstype == ompt_work_distribute      ? "distribute" : 
-        wstype == ompt_work_taskloop        ? "taskloop"   : "unk";
-
     if ((wstype == ompt_work_loop)
       ||(wstype == ompt_work_sections)
       ||(wstype == ompt_work_single_executor)
@@ -815,15 +808,13 @@ on_ompt_callback_work(
     {
         if (endpoint == ompt_scope_begin)
         {
-
             scope_t *scope = new_scope(
                 wstype == ompt_work_loop            ? scope_loop     :
                 wstype == ompt_work_sections        ? scope_sections :
                 wstype == ompt_work_single_executor ? scope_single   :
                 wstype == ompt_work_taskloop        ? scope_taskloop : 
                     scope_unknown,
-                NULL
-            );
+                NULL);
 
             /* At scope-begin, add to global queue for eventual clean-up at 
                tool-exit */
@@ -837,29 +828,10 @@ on_ompt_callback_work(
             scope_t *current_scope = NULL;
             stack_peek(thread_data->region_scope_stack,
                 (data_item_t*) &current_scope);
-
-            /* add begin node to enclosing scope's stack of nodes */
-            // pthread_mutex_lock(&current_scope->lock);
-            // stack_push(current_scope->task_graph_nodes,
-            //     (data_item_t) {.ptr = scope->begin_node});
-            // stack_push(current_scope->task_graph_nodes,
-            //     (data_item_t) {.ptr = scope->end_node});
-            // pthread_mutex_unlock(&current_scope->lock);
-
-            /* At scope-begin, if the prior scope was a scope-end, link together
-            otherwise, link to encountering task  */
-            // connect_prior_scope_node(thread_data->prior_scope,
-            //     scope->begin_node, task_data);
             
             stack_push(thread_data->region_scope_stack,
                 (data_item_t) {.ptr = scope});
             thread_data->prior_scope = scope;
-
-            // LOG_DEBUG("[t=%lu] %-6s %-16s (scope depth: %lu)",
-            //     thread_data->id,
-            //     (endpoint == ompt_scope_begin ? "begin" : "end"),
-            //     wstype_str,
-            //     stack_size(thread_data->region_scope_stack));
 
             #if DEBUG_LEVEL >= 4
             stack_print(thread_data->region_scope_stack);
@@ -885,6 +857,15 @@ on_ompt_callback_work(
             /* make sure enclosed nodes connect to scope-end node */
             // connect_enclosed_nodes(thread_data->prior_scope,
             //     thread_data->prior_scope->end_node);
+
+            char *wstype_str= 
+                wstype == ompt_work_loop            ? "loop"       : 
+                wstype == ompt_work_sections        ? "sections"   : 
+                wstype == ompt_work_single_executor ? "single"     : 
+                wstype == ompt_work_single_other    ? "single oth" : 
+                wstype == ompt_work_workshare       ? "workshare"  : 
+                wstype == ompt_work_distribute      ? "distribute" : 
+                wstype == ompt_work_taskloop        ? "taskloop"   : "unk";
 
             // LOG_DEBUG("[t=%lu] %-6s %-16s (scope depth: %lu)",
             //     thread_data->id,
