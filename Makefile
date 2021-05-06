@@ -97,4 +97,4 @@ clean:
 cleanfiles:
 	@-rm -rf *.gv* *.svg *.pdf *.png *.txt *.csv* *.log *.json* \
 	default-archive-path/ \
-	docs/*.pdf docs/*.aux docs/*.gz docs/*.log docs/*.out docs/*.toc
+	docs/*.aux docs/*.gz docs/*.log docs/*.out docs/*.toc
